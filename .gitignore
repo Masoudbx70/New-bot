@@ -1,0 +1,45 @@
+# محیط مجازی پایتون
+venv/
+env/
+.venv/
+ENV/
+
+# فایل‌های محیطی
+.env
+.env.local
+.env.production
+
+# پایگاه داده SQLite
+*.db
+*.sqlite3
+
+# کش پایتون
+__pycache__/
+*.py[cod]
+*$py.class
+
+# لاگ‌ها
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# سیستم عامل
+.DS_Store
+Thumbs.db
+
+# پکیج‌های پایتون
+*.egg-info/
+dist/
+build/
+
+# Railway
+.railway/
+
+# فایل‌های موقت
+tmp/
+temp/
