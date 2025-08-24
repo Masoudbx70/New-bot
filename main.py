@@ -1,7 +1,7 @@
 import os
 import logging
 from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
-from telegram import ParseMode
+from telegram.constants import ParseMode
 from telegram.ext import filters
 
 from config import BOT_TOKEN, ADMIN_IDS
