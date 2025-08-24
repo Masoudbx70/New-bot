@@ -3,7 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
-from config.config import DATABASE_URL
+
+# خواندن متغیرهای محیطی مستقیماً
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # پشتیبانی از PostgreSQL در Railway
 if DATABASE_URL:
@@ -16,7 +18,7 @@ else:
 
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
-SessionLocal = sessionmaker(bind=engine)  # اضافه کردن SessionLocal
+SessionLocal = sessionmaker(bind=engine)
 
 class User(Base):
     __tablename__ = 'users'
