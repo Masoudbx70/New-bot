@@ -1,6 +1,5 @@
 import os
 import logging
-import asyncio
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from config.config import BOT_TOKEN, ADMIN_IDS
 from handlers import group_handlers, auth_handlers, admin_handlers, support_handlers
@@ -12,7 +11,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def main():
+def main():
     # ایجاد برنامه
     application = Application.builder().token(BOT_TOKEN).build()
     
@@ -35,33 +34,19 @@ async def main():
     application.add_handler(CommandHandler("help", support_handlers.help_command))
     application.add_handler(CommandHandler("support", support_handlers.support))
     
-    # شروع ربات - برای Fly.io از webhook استفاده می‌کنیم
-    if os.environ.get('FLY_APP_NAME'):
-        # اجرا در Fly.io با webhook
-        url = f"https://{os.environ['FLY_APP_NAME']}.fly.dev/{BOT_TOKEN}"
-        await application.bot.set_webhook(url)
-        logger.info(f"Webhook set to: {url}")
-        
-        # اجرای سرور HTTP برای Fly.io
-        from aiohttp import web
-        async def handle(request):
-            return web.Response(text="Bot is running")
-        
-        app = web.Application()
-        app.router.add_get('/', handle)
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', 8080)
-        await site.start()
-        logger.info("HTTP server started on port 8080")
-        
-        # نگه داشتن برنامه در حال اجرا
-        while True:
-            await asyncio.sleep(3600)
+    # شروع ربات
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        # اجرا در Railway
+        port = int(os.environ.get("PORT", 8443))
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            url_path=BOT_TOKEN,
+            webhook_url=f"https://{os.environ.get('RAILWAY_STATIC_URL')}.railway.app/{BOT_TOKEN}"
+        )
     else:
-        # اجرا به صورت محلی با polling
-        logger.info("Starting polling locally")
-        await application.run_polling()
+        # اجرا به صورت محلی
+        application.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
