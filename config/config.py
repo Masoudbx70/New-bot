@@ -6,7 +6,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS_STR = os.getenv("ADMIN_IDS", "")
 ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',')] if ADMIN_IDS_STR else []
-GROUP_ID = int(os.getenv("GROUP_ID", "0"))
+GROUP_ID_STR = os.getenv("GROUP_ID", "")
+GROUP_ID = int(GROUP_ID_STR) if GROUP_ID_STR.isdigit() else None
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # سایر تنظیمات
