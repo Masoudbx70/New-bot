@@ -1,7 +1,8 @@
 import os
 import logging
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram import ParseMode
+from telegram.ext import filters
 
 from config import BOT_TOKEN, ADMIN_IDS
 from handlers.group_handlers import setup_group_handlers
@@ -20,7 +21,7 @@ def error(update, context):
 
 def main():
     # ایجاد آپدیتور و دیسپچر
-    updater = Updater(BOT_TOKEN, use_context=True)
+    updater = Updater(BOT_TOKEN)
     dp = updater.dispatcher
 
     # تنظیم هندلرهای مختلف
