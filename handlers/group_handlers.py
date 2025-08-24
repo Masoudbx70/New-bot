@@ -6,7 +6,7 @@ from config.config import GROUP_ID, MAX_MESSAGES_BEFORE_VERIFICATION, TEMPORARY_
 from utils.helpers import is_user_verified
 
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.id != GROUP_ID:
+    if not GROUP_ID or update.effective_chat.id != GROUP_ID:
         return
     
     for new_member in update.message.new_chat_members:
@@ -28,7 +28,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         db_session.close()
 
 async def goodbye_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.id != GROUP_ID:
+    if not GROUP_ID or update.effective_chat.id != GROUP_ID:
         return
     
     left_member = update.message.left_chat_member
@@ -36,7 +36,7 @@ async def goodbye_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(goodbye_text)
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.id != GROUP_ID:
+    if not GROUP_ID or update.effective_chat.id != GROUP_ID:
         return
     
     user = update.effective_user
@@ -68,7 +68,6 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
                     user_id=user.id,
                     until_date=until_date
                 )
-                
                 warning_message = f"کاربر {user.first_name} به دلیل عدم احراز هویت به طور موقت از گروه حذف شد.\nلطفاً برای احراز هویت با ربات در ارتباط باشید."
                 await update.message.reply_text(warning_message)
                 
