@@ -1,206 +1,106 @@
+from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, Filters
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
-from sqlalchemy.orm import Session
-from models.database import User, AdminMessage, Session
-from datetime import datetime
-import os
+from database import Session, User
 
-# خواندن متغیرهای محیطی مستقیماً
-ADMIN_IDS_STR = os.getenv("ADMIN_IDS", "")
-ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',')] if ADMIN_IDS_STR else []
-GROUP_ID_STR = os.getenv("GROUP_ID", "")
-GROUP_ID = int(GROUP_ID_STR) if GROUP_ID_STR.isdigit() else None
+def setup_admin_handlers(dp):
+    dp.add_handler(CommandHandler('admin', admin_panel))
+    dp.add_handler(CallbackQueryHandler(admin_button_handler, pattern='^admin_'))
+    dp.add_handler(MessageHandler(Filters.photo & Filters.chat_type.private, handle_admin_photo))
 
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not ADMIN_IDS or user.id not in ADMIN_IDS:
-        await update.message.reply_text("شما دسترسی به این بخش را ندارید.")
+def admin_panel(update: Update, context):
+    user_id = update.effective_user.id
+    
+    if user_id not in context.bot_data.get('admin_ids', []):
+        update.message.reply_text("❌ شما دسترسی به این بخش را ندارید.")
         return
     
     keyboard = [
-        [InlineKeyboardButton("📋 لیست اعضا", callback_data="members_list")],
-        [InlineKeyboardButton("🖼 مدیریت عکس‌های راهنما", callback_data="manage_guide_images")],
-        [InlineKeyboardButton("📊 آمار ربات", callback_data="bot_stats")],
-        [InlineKeyboardButton("🔍 درخواست‌های pending", callback_data="pending_requests")]
+        [InlineKeyboardButton("📊 لیست اعضای تأیید شده", callback_data='admin_verified_list')],
+        [InlineKeyboardButton("📋 لیست در انتظار تأیید", callback_data='admin_pending_list')],
+        [InlineKeyboardButton("🖼 مدیریت عکس‌های راهنما", callback_data='admin_manage_photos')],
+        [InlineKeyboardButton("📞 پشتیبانی", callback_data='admin_support')]
     ]
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        "👨‍💼 پنل مدیریت ربات:\nلطفاً یکی از گزینه‌ها را انتخاب کنید:",
-        reply_markup=reply_markup
-    )
+    update.message.reply_text("👨‍💻 پنل مدیریت", reply_markup=reply_markup)
 
-async def members_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not ADMIN_IDS or user.id not in ADMIN_IDS:
-        await update.message.reply_text("شما دسترسی به این بخش را ندارید.")
-        return
-    
-    db_session = Session()
-    verified_users = db_session.query(User).filter(User.is_verified == True).all()
-    
-    if not verified_users:
-        await update.message.reply_text("هیچ عضو تأیید شده‌ای وجود ندارد.")
-        db_session.close()
-        return
-    
-    # تقسیم لیست به بخش‌های کوچکتر برای جلوگیری از محدودیت طول پیام
-    for i in range(0, len(verified_users), 20):
-        user_batch = verified_users[i:i+20]
-        verified_text = "✅ اعضای تأیید شده:\n\n"
-        for j, user in enumerate(user_batch, i+1):
-            verified_text += f"{j}. {user.first_name} {user.last_name or ''} - @{user.username or 'بدون نام کاربری'}\n"
-        await update.message.reply_text(verified_text)
-    
-    db_session.close()
-
-async def pending_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not ADMIN_IDS or user.id not in ADMIN_IDS:
-        await update.message.reply_text("شما دسترسی به این بخش را ندارید.")
-        return
-    
-    db_session = Session()
-    pending_users = db_session.query(User).filter(User.verification_requested == True, User.is_verified == False).all()
-    
-    if not pending_users:
-        await update.message.reply_text("هیچ درخواست pendingی وجود ندارد.")
-        db_session.close()
-        return
-    
-    for user in pending_users:
-        # ایجاد دکمه‌های فوری برای هر کاربر
-        keyboard = [
-            [
-                InlineKeyboardButton(f"✅ تأیید {user.first_name}", callback_data=f"verify_{user.user_id}"),
-                InlineKeyboardButton(f"❌ رد {user.first_name}", callback_data=f"reject_{user.user_id}")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            f"کاربر: {user.first_name}\nتلفن: {user.phone_number}\n",
-            reply_markup=reply_markup
-        )
-    
-    db_session.close()
-
-async def manage_guide_images(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not ADMIN_IDS or user.id not in ADMIN_IDS:
-        await update.message.reply_text("شما دسترسی به این بخش را ندارید.")
-        return
-    
-    keyboard = [
-        [InlineKeyboardButton("📷 افزودن عکس راهنما", callback_data="add_guide_image")],
-        [InlineKeyboardButton("✏️ ویرایش عکس راهنما", callback_data="edit_guide_image")],
-        [InlineKeyboardButton("🗑 حذف عکس راهنما", callback_data="delete_guide_image")],
-        [InlineKeyboardButton("🔙 بازگشت", callback_data="back_to_admin")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(
-        "🖼 مدیریت عکس‌های راهنما:\nلطفاً یکی از گزینه‌ها را انتخاب کنید:",
-        reply_markup=reply_markup
-    )
-
-async def bot_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not ADMIN_IDS or user.id not in ADMIN_IDS:
-        await update.message.reply_text("شما دسترسی به این بخش را ندارید.")
-        return
-    
-    db_session = Session()
-    total_users = db_session.query(User).count()
-    verified_users = db_session.query(User).filter(User.is_verified == True).count()
-    pending_users = db_session.query(User).filter(User.verification_requested == True, User.is_verified == False).count()
-    
-    stats_text = (
-        f"📊 آمار ربات:\n\n"
-        f"👥 کل کاربران: {total_users}\n"
-        f"✅ کاربران تأیید شده: {verified_users}\n"
-        f"⏳ درخواست‌های pending: {pending_users}\n"
-        f"📅 تاریخ امروز: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-    )
-    
-    await update.message.reply_text(stats_text)
-    db_session.close()
-
-async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def admin_button_handler(update: Update, context):
     query = update.callback_query
-    await query.answer()
+    data = query.data
     
-    if query.data == "members_list":
-        await members_list(update, context)
-    elif query.data == "pending_requests":
-        await pending_requests(update, context)
-    elif query.data == "manage_guide_images":
-        await manage_guide_images(update, context)
-    elif query.data == "bot_stats":
-        await bot_stats(update, context)
-    elif query.data.startswith("verify_"):
-        user_id = int(query.data.split("_")[1])
-        await verify_user(update, context, user_id)
-    elif query.data.startswith("reject_"):
-        user_id = int(query.data.split("_")[1])
-        await reject_user(update, context, user_id)
-    elif query.data == "back_to_admin":
-        await admin_panel(update, context)
+    if data == 'admin_verified_list':
+        # نمایش لیست اعضای تأیید شده
+        session = Session()
+        verified_users = session.query(User).filter(User.is_verified == True).all()
+        
+        if verified_users:
+            message = "✅ اعضای تأیید شده:\n\n"
+            for user in verified_users:
+                message += f"👤 {user.get_full_name()} - 📞 {user.phone_number} - 📅 {user.verified_at}\n"
+        else:
+            message = "❌ هیچ کاربر تأیید شده‌ای وجود ندارد."
+        
+        query.message.reply_text(message)
+        session.close()
+    
+    elif data == 'admin_pending_list':
+        # نمایش لیست در انتظار تأیید
+        session = Session()
+        pending_users = session.query(User).filter(
+            User.is_verified == False, 
+            User.screenshot1_file_id != None
+        ).all()
+        
+        if pending_users:
+            message = "📋 کاربران در انتظار تأیید:\n\n"
+            for user in pending_users:
+                message += f"👤 {user.get_full_name()} - 📞 {user.phone_number} - 📅 {user.created_at}\n"
+                
+                # ایجاد دکمه‌های تأیید/رد برای هر کاربر
+                keyboard = [
+                    [
+                        InlineKeyboardButton(f"✅ تأیید {user.get_full_name()}", callback_data=f'admin_approve_{user.user_id}'),
+                        InlineKeyboardButton(f"❌ رد {user.get_full_name()}", callback_data=f'admin_reject_{user.user_id}')
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                query.message.reply_text(message, reply_markup=reply_markup)
+                message = ""  # پاک کردن پیام برای کاربران بعدی
+        else:
+            query.message.reply_text("✅ هیچ کاربری در انتظار تأیید نیست.")
+        
+        session.close()
+    
+    elif data == 'admin_manage_photos':
+        # مدیریت عکس‌های راهنما
+        keyboard = [
+            [InlineKeyboardButton("➕ افزودن عکس راهنما", callback_data='admin_add_guide_photo')],
+            [InlineKeyboardButton("✏️ ویرایش عکس راهنما", callback_data='admin_edit_guide_photo')],
+            [InlineKeyboardButton("🗑 حذف عکس راهنما", callback_data='admin_delete_guide_photo')],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data='admin_back')]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.message.reply_text("🖼 مدیریت عکس‌های راهنما", reply_markup=reply_markup)
+    
+    elif data == 'admin_support':
+        # بخش پشتیبانی
+        query.message.reply_text("📞 برای پشتیبانی می‌توانید با آیدی @example_support در ارتباط باشید.")
+    
+    query.answer()
 
-async def verify_user(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    db_session = Session()
-    user = db_session.query(User).filter(User.user_id == user_id).first()
+def handle_admin_photo(update: Update, context):
+    # مدیریت آپلود عکس‌های راهنما توسط ادمین
+    user_id = update.effective_user.id
     
-    if user:
-        user.is_verified = True
-        user.verified_at = datetime.now()
-        db_session.commit()
-        
-        # ارسال پیام تبریک به کاربر
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text="🎉 تبریک! احراز هویت شما تأیید شد!\n\nاکنون می‌توانید در گروه فعالیت کنید.\n\nاز بابت مسدودیت موقت پیش آمده پوزش می‌خواهیم."
-            )
-        except:
-            pass  # اگر ربات نتواند به کاربر پیام بدهد
-        
-        # ارسال پیام خوش آمد به گروه
-        try:
-            await context.bot.send_message(
-                chat_id=GROUP_ID,
-                text=f"🎊 کاربر {user.first_name} با موفقیت احراز هویت شد و به جمع ما پیوست! خوش آمدید."
-            )
-        except:
-            pass  # اگر ربات نتوانست در گروه پیام بدهد
-        
-        await update.callback_query.edit_message_text("✅ کاربر تأیید شد.")
-    else:
-        await update.callback_query.edit_message_text("❌ کاربر یافت نشد.")
+    if user_id not in context.bot_data.get('admin_ids', []):
+        return
     
-    db_session.close()
-
-async def reject_user(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
-    db_session = Session()
-    user = db_session.query(User).filter(User.user_id == user_id).first()
+    photo_file_id = update.message.photo[-1].file_id
+    caption = update.message.caption
     
-    if user:
-        # ارسال پیام رد درخواست به کاربر
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text="❌ متأسفانه درخواست احراز هویت شما رد شد.\n\nلطفاً با پشتیبانی تماس بگیرید."
-            )
-        except:
-            pass  # اگر ربات نتواند به کاربر پیام بدهد
-        
-        db_session.delete(user)
-        db_session.commit()
-        await update.callback_query.edit_message_text("❌ درخواست کاربر رد شد.")
-    else:
-        await update.callback_query.edit_message_text("❌ کاربر یافت نشد.")
+    # ذخیره file_id در دیتابیس یا context برای استفاده بعدی
+    # این بخش نیاز به پیاده سازی بر اساس نیازهای خاص دارد
     
-    db_session.close()
-
-def callback_query_handler():
-    return CallbackQueryHandler(handle_admin_callback)
+    update.message.reply_text("✅ عکس راهنما با موفقیت ذخیره شد.")
