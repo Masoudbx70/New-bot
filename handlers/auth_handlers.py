@@ -2,10 +2,15 @@ from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardB
 from telegram.ext import ContextTypes, ConversationHandler
 from sqlalchemy.orm import Session
 from models.database import User, Session
-from config.config import ADMIN_IDS, GROUP_ID
 from utils.helpers import validate_phone_number, validate_name
 from datetime import datetime
-import re
+import os
+
+# خواندن متغیرهای محیطی مستقیماً
+ADMIN_IDS_STR = os.getenv("ADMIN_IDS", "")
+ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',')] if ADMIN_IDS_STR else []
+GROUP_ID_STR = os.getenv("GROUP_ID", "")
+GROUP_ID = int(GROUP_ID_STR) if GROUP_ID_STR.isdigit() else None
 
 # مراحل احراز هویت
 NAME, PHONE, SCREENSHOT1, SCREENSHOT2 = range(4)
