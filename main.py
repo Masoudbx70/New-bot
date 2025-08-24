@@ -46,18 +46,31 @@ def main():
     # افزودن هندلر برای callback queries
     application.add_handler(admin_handlers.callback_query_handler())
     
+    # افزودن هندلر برای پیام‌های پشتیبانی
+    application.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, support_handlers.forward_to_support))
+    application.add_handler(MessageHandler(filters.CONTACT & filters.ChatType.PRIVATE, support_handlers.handle_contact))
+    
     # شروع ربات
-    if os.environ.get('RAILWAY_ENVIRONMENT'):
+    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_GIT_COMMIT_SHA'):
         # اجرا در Railway
-        url = os.environ.get('RAILWAY_STATIC_URL', '').replace('https://', '')
-        webhook_url = f"https://{url}/webhook" if url else None
+        port = int(os.environ.get("PORT", 8443))
+        webhook_url = os.environ.get('RAILWAY_STATIC_URL')
         
         if webhook_url:
+            # حذف https:// از ابتدای URL اگر وجود دارد
+            if webhook_url.startswith('https://'):
+                webhook_url = webhook_url[8:]
+            
+            full_webhook_url = f"https://{webhook_url}/webhook"
+            
+            await application.initialize()
+            await application.bot.set_webhook(url=full_webhook_url)
+            
             application.run_webhook(
                 listen="0.0.0.0",
-                port=int(os.environ.get("PORT", 8443)),
+                port=port,
+                webhook_url=full_webhook_url,
                 url_path="webhook",
-                webhook_url=webhook_url,
                 drop_pending_updates=True
             )
         else:
