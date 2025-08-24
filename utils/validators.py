@@ -4,7 +4,6 @@ def validate_national_code(code):
     """اعتبارسنجی کد ملی ایران"""
     if not re.match(r'^\d{10}$', code):
         return False
-    
     check = int(code[9])
     s = sum(int(code[i]) * (10 - i) for i in range(9)) % 11
     return (s < 2 and check == s) or (s >= 2 and check + s == 11)
