@@ -43,7 +43,7 @@ def main():
     application.add_handler(CommandHandler("help", support_handlers.help_command))
     application.add_handler(CommandHandler("support", support_handlers.support))
     
-    # افزودن هندلر برای callback queries
+    # افزودن هندلر برای callback queries - این خط اصلاح شده
     application.add_handler(admin_handlers.callback_query_handler())
     
     # افزودن هندلر برای پیام‌های پشتیبانی
@@ -62,9 +62,6 @@ def main():
                 webhook_url = webhook_url[8:]
             
             full_webhook_url = f"https://{webhook_url}/webhook"
-            
-            await application.initialize()
-            await application.bot.set_webhook(url=full_webhook_url)
             
             application.run_webhook(
                 listen="0.0.0.0",
