@@ -16,6 +16,7 @@ else:
 
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(bind=engine)  # اضافه کردن SessionLocal
 
 class User(Base):
     __tablename__ = 'users'
