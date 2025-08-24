@@ -1,7 +1,6 @@
 import os
 import logging
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler
-from config.config import BOT_TOKEN, ADMIN_IDS
 from handlers import group_handlers, auth_handlers, admin_handlers, support_handlers
 
 # تنظیمات لاگ
@@ -10,6 +9,28 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# خواندن متغیرهای محیطی مستقیماً
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_IDS_STR = os.getenv("ADMIN_IDS", "")
+ADMIN_IDS = [int(id.strip()) for id in ADMIN_IDS_STR.split(',')] if ADMIN_IDS_STR else []
+GROUP_ID_STR = os.getenv("GROUP_ID", "")
+GROUP_ID = int(GROUP_ID_STR) if GROUP_ID_STR.isdigit() else None
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# سایر تنظیمات
+MAX_MESSAGES_BEFORE_VERIFICATION = 3
+TEMPORARY_BAN_DURATION = 3600  # 1 ساعت به ثانیه
+
+# بررسی تنظیمات ضروری
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN environment variable is required!")
+
+if not ADMIN_IDS:
+    print("Warning: ADMIN_IDS is empty. Admin features will not work.")
+
+if not GROUP_ID:
+    print("Warning: GROUP_ID is not set. Group features will not work.")
 
 def main():
     # ایجاد برنامه
@@ -43,7 +64,7 @@ def main():
     application.add_handler(CommandHandler("help", support_handlers.help_command))
     application.add_handler(CommandHandler("support", support_handlers.support))
     
-    # افزودن هندلر برای callback queries - این خط اصلاح شده
+    # افزودن هندلر برای callback queries
     application.add_handler(admin_handlers.callback_query_handler())
     
     # افزودن هندلر برای پیام‌های پشتیبانی
