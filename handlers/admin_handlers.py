@@ -196,5 +196,6 @@ async def reject_user(update: Update, context: ContextTypes.DEFAULT_TYPE, user_i
     
     db_session.close()
 
+# این تابع اضافه شده است - برای حل خطای AttributeError
 def callback_query_handler():
     return CallbackQueryHandler(handle_admin_callback)
