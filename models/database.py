@@ -1,50 +1,41 @@
-# models/database.py
-import os
-from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.orm import sessionmaker, declarative_base
+from datetime import datetime
+import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+# خواندن DATABASE_URL از محیط
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///bot.db")
 
-if DATABASE_URL and DATABASE_URL.startswith("postgres"):
-    engine = create_engine(DATABASE_URL, echo=False)
-else:
-    # فایل sqlite محلی پیش‌فرض
-    engine = create_engine('sqlite:///bot.db', echo=False, connect_args={"check_same_thread": False})
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# تعریف یک alias برای Session مثل قبل
+Session = SessionLocal
 
 Base = declarative_base()
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class User(Base):
-    __tablename__ = 'users'
-
+    __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, unique=True, index=True)
+    user_id = Column(Integer, unique=True, index=True, nullable=False)
     username = Column(String, nullable=True)
-    first_name = Column(String, nullable=True)
+    first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=True)
     phone_number = Column(String, nullable=True)
+    is_verified = Column(Boolean, default=False)
+    verification_requested = Column(Boolean, default=False)
     screenshot1 = Column(String, nullable=True)
     screenshot2 = Column(String, nullable=True)
-    is_verified = Column(Boolean, default=False)
-    is_banned = Column(Boolean, default=False)
-    message_count = Column(Integer, default=0)
-    verification_requested = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
     verified_at = Column(DateTime, nullable=True)
 
 class AdminMessage(Base):
-    __tablename__ = 'admin_messages'
-
+    __tablename__ = "admin_messages"
     id = Column(Integer, primary_key=True, index=True)
-    message_type = Column(String)  # 'guide', 'welcome', etc.
-    file_id = Column(String, nullable=True)
-    caption = Column(String, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, nullable=False)
+    message_text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
 
-# ایجاد جداول (ایمن برای بار اول)
+# ساخت جداول در صورت وجود نداشتن
 def init_db():
     Base.metadata.create_all(bind=engine)
-
-# اجرای اولیه ساخت جداول هنگام ایمپورت main
-init_db()
