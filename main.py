@@ -84,6 +84,10 @@ def main():
             
             full_webhook_url = f"https://{webhook_url}/webhook"
             
+            # تنظیم webhook قبل از اجرا
+            async def set_webhook():
+                await application.bot.set_webhook(url=full_webhook_url)
+            
             application.run_webhook(
                 listen="0.0.0.0",
                 port=port,
@@ -92,6 +96,7 @@ def main():
                 drop_pending_updates=True
             )
         else:
+            # اگر webhook_url وجود ندارد، از polling استفاده کن
             application.run_polling()
     else:
         # اجرا به صورت محلی
