@@ -1,9 +1,8 @@
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, ConversationHandler
 from sqlalchemy.orm import Session
 from models.database import User, Session
 from config.config import ADMIN_IDS, GROUP_ID
-from utils.helpers import validate_phone_number, validate_name
 import re
 
 # مراحل احراز هویت
@@ -14,8 +13,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"سلام {user.first_name}!\n"
         "به ربات احراز هویت گروه مسکن ملی پویان بتن نیشابور خوش آمدید.\n"
-        "برای شروع فرآیند احراز هویت، از دستور /verify استفاده کنید.\n\n"
-        "برای راهنمایی بیشتر از دستور /help استفاده کنید."
+        "برای شروع فرآیند احراز هویت، از دستور /verify استفاده کنید."
     )
 
 async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -29,9 +27,6 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
         db_session.close()
         return ConversationHandler.END
     
-    # اگر کاربر در حال انجام فرآیند است، از اول شروع کنیم
-    context.user_data.clear()
-    
     if not user_data:
         user_data = User(user_id=user.id, username=user.username, first_name=user.first_name)
         db_session.add(user_data)
@@ -40,20 +35,14 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     db_session.close()
     
     await update.message.reply_text(
-        "فرآیند احراز هویت شروع شد.\nلطفاً نام و نام خانوادگی خود را وارد کنید:",
+        "لطفاً نام و نام خانوادگی خود را وارد کنید:",
         reply_markup=ReplyKeyboardRemove()
     )
     
     return NAME
 
 async def handle_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.message.text.strip()
-    
-    # اعتبارسنجی نام
-    if not validate_name(name):
-        await update.message.reply_text("لطفاً یک نام معتبر وارد کنید (حداقل ۳ حرف):")
-        return NAME
-    
+    name = update.message.text
     context.user_data['name'] = name
     
     # ایجاد دکمه برای اشتراک گذاری شماره تلفن
@@ -73,8 +62,8 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         phone_number = update.message.text
         # اعتبارسنجی شماره تلفن
-        if not validate_phone_number(phone_number):
-            await update.message.reply_text("لطفاً یک شماره تلفن معتبر وارد کنید (مثال: 09123456789):")
+        if not re.match(r'^\+?[0-9]{10,15}$', phone_number):
+            await update.message.reply_text("لطفاً یک شماره تلفن معتبر وارد کنید:")
             return PHONE
     
     context.user_data['phone'] = phone_number
@@ -85,10 +74,7 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user_data:
         user_data.phone_number = phone_number
-        # تقسیم نام به نام و نام خانوادگی
-        name_parts = context.user_data['name'].split(' ', 1)
-        user_data.first_name = name_parts[0]
-        user_data.last_name = name_parts[1] if len(name_parts) > 1 else ''
+        user_data.first_name = context.user_data['name']
         db_session.commit()
     
     db_session.close()
@@ -147,9 +133,8 @@ async def handle_screenshot2(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await send_verification_to_admin(update, context)
     
     await update.message.reply_text(
-        "✅ اطلاعات شما با موفقیت ثبت شد و برای بررسی به ادمین ارسال گردید.\n"
-        "پس از تأیید، شما می‌توانید در گروه فعالیت کنید.\n\n"
-        "برای پیگیری وضعیت می‌توانید با ادمین ها در ارتباط باشید."
+        "اطلاعات شما با موفقیت ثبت شد و برای بررسی به ادمین ارسال گردید.\n"
+        "پس از تأیید، شما می‌توانید در گروه فعالیت کنید."
     )
     
     return ConversationHandler.END
@@ -162,11 +147,10 @@ async def send_verification_to_admin(update: Update, context: ContextTypes.DEFAU
     screenshot2 = context.user_data.get('screenshot2', '')
     
     message_text = (
-        f"📋 درخواست احراز هویت جدید:\n\n"
-        f"👤 کاربر: {user.first_name} {user.last_name or ''} (@{user.username or 'بدون نام کاربری'})\n"
-        f"🆔 آیدی عددی: {user.id}\n"
-        f"📛 نام کامل: {name}\n"
-        f"📞 شماره تلفن: {phone}\n\n"
+        f"درخواست احراز هویت جدید:\n\n"
+        f"کاربر: {user.first_name} {user.last_name or ''} (@{user.username or 'بدون نام کاربری'})\n"
+        f"نام کامل: {name}\n"
+        f"شماره تلفن: {phone}\n\n"
         f"لطفاً تأیید یا رد کنید:"
     )
     
@@ -174,8 +158,8 @@ async def send_verification_to_admin(update: Update, context: ContextTypes.DEFAU
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     keyboard = [
         [
-            InlineKeyboardButton("✅ تأیید عضویت", callback_data=f"verify_{user.id}"),
-            InlineKeyboardButton("❌ رد عضویت", callback_data=f"reject_{user.id}")
+            InlineKeyboardButton("تأیید عضویت", callback_data=f"verify_{user.id}"),
+            InlineKeyboardButton("رد عضویت", callback_data=f"reject_{user.id}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -206,17 +190,3 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardRemove()
     )
     return ConversationHandler.END
-
-# اضافه کردن هندلر برای callback queries
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from handlers.admin_handlers import verify_user, reject_user
-    
-    query = update.callback_query
-    await query.answer()
-    
-    if query.data.startswith("verify_"):
-        user_id = int(query.data.split("_")[1])
-        await verify_user(update, context, user_id)
-    elif query.data.startswith("reject_"):
-        user_id = int(query.data.split("_")[1])
-        await reject_user(update, context, user_id)
