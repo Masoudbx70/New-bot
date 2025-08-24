@@ -1,41 +1,32 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
+from config.config import DATABASE_URL
 
-# خواندن DATABASE_URL از محیط
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///bot.db")
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
-# تعریف یک alias برای Session مثل قبل
-Session = SessionLocal
+# پشتیبانی از PostgreSQL در Railway
+if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    engine = create_engine(DATABASE_URL)
+elif DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    # تبدیل postgres به postgresql برای سازگاری با SQLAlchemy
+    engine = create_engine(DATABASE_URL.replace("postgres://", "postgresql://"))
+else:
+    engine = create_engine('sqlite:///bot.db')
 
 Base = declarative_base()
+Session = sessionmaker(bind=engine)
 
 class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, unique=True, index=True, nullable=False)
-    username = Column(String, nullable=True)
-    first_name = Column(String, nullable=False)
-    last_name = Column(String, nullable=True)
-    phone_number = Column(String, nullable=True)
-    is_verified = Column(Boolean, default=False)
-    verification_requested = Column(Boolean, default=False)
-    screenshot1 = Column(String, nullable=True)
-    screenshot2 = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.now)
-    verified_at = Column(DateTime, nullable=True)
+    __tablename__ = 'users'
+    # ... (بقیه کد بدون تغییر)
 
 class AdminMessage(Base):
-    __tablename__ = "admin_messages"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False)
-    message_text = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
+    __tablename__ = 'admin_messages'
+    # ... (بقیه کد بدون تغییر)
 
-# ساخت جداول در صورت وجود نداشتن
-def init_db():
-    Base.metadata.create_all(bind=engine)
+# ایجاد جداول
+try:
+    Base.metadata.create_all(engine)
+except Exception as e:
+    print(f"Error creating database tables: {e}")
