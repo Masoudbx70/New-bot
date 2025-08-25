@@ -1,7 +1,0 @@
-from .config import (
-    BOT_TOKEN, 
-    ADMIN_IDS, 
-    DATABASE_URL, 
-    MAX_MESSAGES_BEFORE_VERIFICATION, 
-    TEMPORARY_BAN_MINUTES
-)
