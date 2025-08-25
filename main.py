@@ -5,6 +5,9 @@ from telegram.constants import ParseMode
 from telegram.ext import filters
 
 from config import BOT_TOKEN, ADMIN_IDS
+from handlers.group_handlers import setup_group_handlers
+from handlers.auth_handlers import setup_auth_handlers
+from handlers.admin_handlers import setup_admin_handlers
 
 # تنظیمات لاگ
 logging.basicConfig(
@@ -23,11 +26,7 @@ def main():
     # ذخیره آیدی ادمین‌ها در context برای دسترسی در هندلرها
     application.bot_data['admin_ids'] = ADMIN_IDS
 
-    # ایمپورت و تنظیم هندلرها
-    from handlers.group_handlers import setup_group_handlers
-    from handlers.auth_handlers import setup_auth_handlers
-    from handlers.admin_handlers import setup_admin_handlers
-    
+    # تنظیم هندلرهای مختلف
     setup_group_handlers(application)
     setup_auth_handlers(application)
     setup_admin_handlers(application)
