@@ -2,6 +2,12 @@ import redis
 import config.config as config
 
 # اتصال به Redis برای مدیریت وضعیت کاربران و پیام‌ها
+try:
+    redis_client = redis.from_url(config.REDIS_URL)
+except redis.ConnectionError:
+    print("Warning: Could not connect to Redis. Using in-memory storage.")
+    # می‌توانید یک جایگزین در حافظه ایجاد کنید یا از دیتابیس استفاده کنید
+# اتصال به Redis برای مدیریت وضعیت کاربران و پیام‌ها
 redis_client = redis.from_url(config.REDIS_URL)
 
 def get_user_state(user_id):
