@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import pytz
 from telegram.ext import filters
 
+# به این تغییر دهید:
 from models import Session, User
 from config import MAX_MESSAGES_BEFORE_VERIFICATION, TEMPORARY_BAN_MINUTES
 
