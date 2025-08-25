@@ -1,14 +1,10 @@
 import re
 
-def validate_national_code(code):
-    """اعتبارسنجی کد ملی ایران"""
-    if not re.match(r'^\d{10}$', code):
-        return False
-    check = int(code[9])
-    s = sum(int(code[i]) * (10 - i) for i in range(9)) % 11
-    return (s < 2 and check == s) or (s >= 2 and check + s == 11)
+def validate_phone(phone):
+    pattern = r'^(\+98|0)?9\d{9}$'
+    return re.match(pattern, phone) is not None
 
-def validate_email(email):
-    """اعتبارسنجی ایمیل"""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
+def validate_name(name):
+    # نام باید فقط حاوی حروف فارسی یا انگلیسی و فاصله باشد
+    pattern = r'^[\u0600-\u06FFa-zA-Z\s]+$'
+    return re.match(pattern, name) is not None
