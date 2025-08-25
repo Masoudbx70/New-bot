@@ -1,85 +1,77 @@
-from telegram.ext import MessageHandler, CallbackContext
-from telegram import Update, ChatPermissions
-from datetime import datetime, timedelta
-import pytz
-from telegram.ext import filters
+from telegram import Update, Bot
+from telegram.ext import ContextTypes
+from sqlalchemy.orm import Session
+from models.database import User, get_db
+import utils.helpers as helpers
+import config.config as config
 
-# به این تغییر دهید:
-from models import Session, User
-from config import MAX_MESSAGES_BEFORE_VERIFICATION, TEMPORARY_BAN_MINUTES
-
-def setup_group_handlers(application):
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
-    application.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_member))
-    application.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.Text(["سلام", "سلام علیکم", "سلام بر شما", "سلام به همه"]), reply_to_salam))
-    application.add_handler(MessageHandler(filters.ChatType.GROUPS & ~filters.StatusUpdate.ALL, count_user_messages))
-
-async def welcome_new_member(update: Update, context: CallbackContext):
+async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for new_member in update.message.new_chat_members:
-        if new_member.is_bot and new_member.id == context.bot.id:
-            # ربات به گروه اضافه شده
-            await update.message.reply_text("سلام! من ربات مدیریت گروه مسکن ملی پویان بتن نیشابور هستم. برای اطلاعات بیشتر /help رو بفرستید.")
+        user_id = new_member.id
+        first_name = new_member.first_name
+        
+        # بررسی آیا کاربر در دیتابیس وجود دارد و تأیید شده است
+        db = next(get_db())
+        user = db.query(User).filter(User.user_id == user_id).first()
+        
+        if user and user.is_verified:
+            welcome_message = f"سلام {first_name}!\nبه گروه مسکن ملی پویان بتن نیشابور خوش آمدید!"
+            await update.message.reply_text(welcome_message)
         else:
-            # کاربر جدید به گروه اضافه شده
-            session = Session()
-            user = session.query(User).filter(User.user_id == new_member.id).first()
+            welcome_message = f"سلام {first_name}!\nبه گروه مسکن ملی پویان بتن نیشابور خوش آمدید!\nلطفاً برای فعالیت در گروه، ابتدا از طریق ربات احراز هویت کنید."
+            await update.message.reply_text(welcome_message)
             
-            if user and user.is_verified:
-                welcome_msg = f"سلام {new_member.first_name}!\nبه گروه مسکن ملی پویان بتن نیشابور خوش آمدی!"
-            else:
-                welcome_msg = f"سلام {new_member.first_name}!\nبه گروه مسکن ملی پویان بتن نیشابور خوش آمدی!\nلطفاً برای فعال شدن کامل در گروه، ابتدا از طریق ربات احراز هویت کنید. برای شروع /start رو بفرستید."
-            
-            await update.message.reply_text(welcome_msg)
-            session.close()
+            # اگر کاربر وجود ندارد، یک رکورد جدید ایجاد کنید
+            if not user:
+                new_user = User(
+                    user_id=user_id,
+                    username=new_member.username,
+                    first_name=first_name,
+                    is_verified=False
+                )
+                db.add(new_user)
+                db.commit()
 
-async def goodbye_member(update: Update, context: CallbackContext):
+async def farewell_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
     left_member = update.message.left_chat_member
-    farewell_msg = f"👋 {left_member.first_name} از گروه ما رفت. امیدواریم باز هم به ما بپیوندی."
-    await update.message.reply_text(farewell_msg)
+    farewell_message = f"خدانگهدار {left_member.first_name}!\nامیدواریم باز هم به ما بپیوندید."
+    await update.message.reply_text(farewell_message)
 
-async def reply_to_salam(update: Update, context: CallbackContext):
-    user = update.effective_user
-    reply_text = f"سلام {user.first_name} عزیز 🙏\nچطور می‌تونم کمکتون کنم?"
-    await update.message.reply_text(reply_text)
+async def respond_to_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text.lower()
+    greetings = ['سلام', 'hello', 'hi', 'سلامونک', 'slm', 'salam']
+    
+    if any(greeting in message_text for greeting in greetings):
+        user = update.message.from_user
+        response = f"سلام {user.first_name} عزیز! خوش آمدید. 😊"
+        await update.message.reply_text(response)
 
-async def count_user_messages(update: Update, context: CallbackContext):
-    user = update.effective_user
-    chat = update.effective_chat
+async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    chat_id = update.message.chat_id
     
-    session = Session()
-    db_user = session.query(User).filter(User.user_id == user.id).first()
+    # اگر کاربر ادمین است، نیاز به بررسی ندارد
+    db = next(get_db())
+    user = db.query(User).filter(User.user_id == user_id).first()
     
-    if not db_user or not db_user.is_verified:
-        if not db_user:
-            # کاربر جدید در دیتابیس
-            db_user = User(
-                user_id=user.id,
-                chat_id=chat.id,
-                first_name=user.first_name,
-                last_name=user.last_name or ""
-            )
-            session.add(db_user)
+    if user and user.is_admin:
+        return
+    
+    # اگر کاربر تأیید نشده است
+    if not user or not user.is_verified:
+        message_count = helpers.increment_message_count(user_id)
         
-        db_user.message_count += 1
-        session.commit()
-        
-        if db_user.message_count >= MAX_MESSAGES_BEFORE_VERIFICATION:
-            # محدود کردن کاربر
-            until_date = datetime.now(pytz.utc) + timedelta(minutes=TEMPORARY_BAN_MINUTES)
-            await context.bot.restrict_chat_member(
-                chat_id=chat.id,
-                user_id=user.id,
-                permissions=ChatPermissions(can_send_messages=False),
-                until_date=until_date
-            )
-            
-            # اعلام مسدودیت
-            warning_msg = f"⚠️ کاربر {user.first_name} به دلیل عدم تکمیل احراز هویت به صورت موقت مسدود شد.\nلطفاً برای فعال شدن، از طریق ربات احراز هویت کنید."
-            await update.message.reply_text(warning_msg)
-            
-            # ریست کردن شمارنده پیام
-            db_user.message_count = 0
-            db_user.is_banned = True
-            session.commit()
-    
-    session.close()
+        if message_count == 1:
+            warning = "کاربر عزیز، لطفاً برای ادامه فعالیت در گروه، از طریق ربات احراز هویت کنید."
+            await update.message.reply_text(warning)
+        elif message_count == 2:
+            warning = "این دومین اخطار شماست. پس از یک اخطار دیگر، به طور موقت از گروه حذف خواهید شد."
+            await update.message.reply_text(warning)
+        elif message_count >= 3:
+            # حذف کاربر از گروه
+            try:
+                await context.bot.ban_chat_member(chat_id, user_id, until_date=60)  # مسدود به مدت 1 دقیقه
+                await update.message.reply_text(f"کاربر {update.message.from_user.first_name} به دلیل عدم احراز هویت به طور موقت از گروه حذف شد.")
+                helpers.reset_message_count(user_id)
+            except Exception as e:
+                print(f"Error banning user: {e}")
