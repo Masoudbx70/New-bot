@@ -1,6 +1,8 @@
 from telegram.ext import CommandHandler, MessageHandler, ConversationHandler, CallbackContext
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import filters
+
+# به این تغییر دهید:
 from models import Session, User
 from config import ADMIN_IDS
 
