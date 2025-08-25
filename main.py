@@ -1,15 +1,29 @@
 import os
+import threading
+import time
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, CallbackQueryHandler
 from dotenv import load_dotenv
 
 import config.config as config
 from handlers import group_handlers, auth_handlers, admin_handlers, support_handlers
+import utils.helpers as helpers
 
 # بارگذاری متغیرهای محیطی
 load_dotenv()
 
+def cleanup_task():
+    """وظیفه منظم برای پاک‌سازی کش"""
+    while True:
+        time.sleep(3600)  # هر 1 ساعت
+        helpers.cleanup_expired_cache()
+        print("تمیز کردن کش منقضی شده انجام شد")
+
 def main():
+    # شروع وظیفه تمیزکاری در background
+    cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
+    cleanup_thread.start()
+    
     # ایجاد برنامه‌ی ربات
     application = Application.builder().token(config.TOKEN).build()
     
