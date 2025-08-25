@@ -1,1 +1,2 @@
-from .database import Base, engine, Session, SessionLocal, User
+# models/__init__.py
+from .database import Base, engine, Session, User
