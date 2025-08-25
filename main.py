@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 from telegram.ext import filters
 
@@ -16,37 +16,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def error(update, context):
-    logger.warning('Update "%s" caused error "%s"', update, context.error)
+async def error(update, context):
+    logger.warning(f'Update "{update}" caused error "{context.error}"')
 
 def main():
-    # ایجاد آپدیتور و دیسپچر
-    updater = Updater(BOT_TOKEN)
-    dp = updater.dispatcher
+    # ایجاد Application به جای Updater (در نسخه 20.x)
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    # ذخیره آیدی ادمین‌ها در context برای دسترسی در هندلرها
+    application.bot_data['admin_ids'] = ADMIN_IDS
 
     # تنظیم هندلرهای مختلف
-    setup_group_handlers(dp)
-    setup_auth_handlers(dp)
-    setup_admin_handlers(dp)
+    setup_group_handlers(application)
+    setup_auth_handlers(application)
+    setup_admin_handlers(application)
 
     # هندلر خطا
-    dp.add_error_handler(error)
+    application.add_error_handler(error)
 
     # شروع ربات
     if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('WEBHOOK'):
         # استفاده از وب‌هوک برای Railway
         port = int(os.environ.get('PORT', 8443))
-        updater.start_webhook(
+        webhook_url = f"https://{os.environ.get('RAILWAY_STATIC_URL', 'your-app-name')}.railway.app/{BOT_TOKEN}"
+        
+        application.run_webhook(
             listen="0.0.0.0",
             port=port,
             url_path=BOT_TOKEN,
-            webhook_url=f"https://{os.environ.get('RAILWAY_STATIC_URL')}.railway.app/{BOT_TOKEN}"
+            webhook_url=webhook_url
         )
     else:
         # استفاده از پولینگ برای توسعه محلی
-        updater.start_polling()
-
-    updater.idle()
+        application.run_polling()
 
 if __name__ == '__main__':
     main()
